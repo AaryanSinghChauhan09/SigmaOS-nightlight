@@ -1,0 +1,17 @@
+[package]
+name = "sigmaos-nightlight"
+version = "0.1.0"
+edition = "2021"
+authors = ["SigmaOS Project"]
+description = "Nightlight blue light filter"
+license = "GPL-3.0-or-later"
+repository = "https://github.com/AaryanSinghChauhan09/SigmaOS-nightlight"
+readme = "README.md"
+keywords = ["nightlight", "blue-light", "filter"]
+categories = ["gui"]
+
+[dependencies]
+sigmaos-kernel = { version = "0.1", path = "../SigmaOS-kernel" }
+
+[profile.release]
+opt-level = 3
