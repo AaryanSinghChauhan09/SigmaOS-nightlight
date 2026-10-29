@@ -3,4 +3,6 @@
 
 pub mod nightlight;
 
-pub use nightlight::Nightlight;
+pub use nightlight::{
+    ColorTemperature, NightlightManager, NightlightManager as Nightlight, NightlightSchedule,
+};
