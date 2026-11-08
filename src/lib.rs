@@ -10,6 +10,9 @@
 use std::fmt;
 use std::collections::BTreeMap;
 
+/// Temperature scheduling and state management for the nightlight component.
+pub mod nightlight;
+
 /// Errors for `DesktopError` operations. Fail-fast: invalid input is rejected.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DesktopError {

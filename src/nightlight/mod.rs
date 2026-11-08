@@ -66,7 +66,13 @@ impl NightlightSchedule {
         }
     }
 
-    pub fn with_time(mut self, start_hour: u8, start_minute: u8, end_hour: u8, end_minute: u8) -> Self {
+    pub fn with_time(
+        mut self,
+        start_hour: u8,
+        start_minute: u8,
+        end_hour: u8,
+        end_minute: u8,
+    ) -> Self {
         self.start_hour = start_hour;
         self.start_minute = start_minute;
         self.end_hour = end_hour;
@@ -84,15 +90,38 @@ impl NightlightSchedule {
         self
     }
 
-    /// Check if current time is within schedule
-    pub fn is_active_now(&self) -> bool {
-        if !self.enabled {
+    /// Validate schedule fields before applying them.
+    pub fn validate(&self) -> Result<(), String> {
+        if self.start_hour >= 24 || self.end_hour >= 24 {
+            return Err("Schedule hours must be between 0 and 23".to_string());
+        }
+        if self.start_minute >= 60 || self.end_minute >= 60 {
+            return Err("Schedule minutes must be between 0 and 59".to_string());
+        }
+        if !(1000..=10000).contains(&self.temperature) {
+            return Err("Temperature must be between 1000K and 10000K".to_string());
+        }
+        Ok(())
+    }
+
+    /// Return whether a local wall-clock time falls in the schedule.
+    /// The interval includes its start and excludes its end. Equal endpoints
+    /// mean the schedule is active for the full day.
+    pub fn is_active_at(&self, hour: u8, minute: u8) -> bool {
+        if !self.enabled || hour >= 24 || minute >= 60 || self.validate().is_err() {
             return false;
         }
 
-        // In a real implementation, this would check current time
-        // For now, we'll simulate it
-        false
+        let now = u16::from(hour) * 60 + u16::from(minute);
+        let start = u16::from(self.start_hour) * 60 + u16::from(self.start_minute);
+        let end = u16::from(self.end_hour) * 60 + u16::from(self.end_minute);
+        if start == end {
+            true
+        } else if start < end {
+            now >= start && now < end
+        } else {
+            now >= start || now < end
+        }
     }
 }
 
@@ -171,9 +200,13 @@ impl NightlightManager {
         &self.schedule
     }
 
-    /// Apply schedule based on current time
-    pub fn apply_schedule(&mut self) -> Result<ColorTemperature, String> {
-        if self.schedule.is_active_now() {
+    /// Apply the configured schedule for the supplied local wall-clock time.
+    pub fn apply_schedule_at(&mut self, hour: u8, minute: u8) -> Result<ColorTemperature, String> {
+        self.schedule.validate()?;
+        if hour >= 24 || minute >= 60 {
+            return Err("Time must be between 00:00 and 23:59".to_string());
+        }
+        if self.schedule.is_active_at(hour, minute) {
             self.set_temperature(self.schedule.temperature)?;
             self.is_enabled = true;
             Ok(self.current_temperature.clone())
@@ -207,7 +240,7 @@ mod tests {
         let temp = manager.toggle();
         assert!(manager.is_enabled());
         assert_eq!(temp.kelvin, 4000);
-        
+
         let temp = manager.toggle();
         assert!(!manager.is_enabled());
         assert_eq!(temp.kelvin, 6500);
@@ -216,11 +249,11 @@ mod tests {
     #[test]
     fn test_enable_disable() {
         let mut manager = NightlightManager::new();
-        
+
         manager.enable();
         assert!(manager.is_enabled());
         assert_eq!(manager.get_temperature().kelvin, 4000);
-        
+
         manager.disable();
         assert!(!manager.is_enabled());
         assert_eq!(manager.get_temperature().kelvin, 6500);
@@ -229,11 +262,11 @@ mod tests {
     #[test]
     fn test_set_temperature() {
         let mut manager = NightlightManager::new();
-        
+
         let result = manager.set_temperature(5000);
         assert!(result.is_ok());
         assert_eq!(manager.get_temperature().kelvin, 5000);
-        
+
         let result = manager.set_temperature(500);
         assert!(result.is_err());
     }
@@ -243,11 +276,11 @@ mod tests {
         let warm = ColorTemperature::night();
         assert!(warm.is_warm());
         assert!(!warm.is_cool());
-        
+
         let cool = ColorTemperature::daylight();
         assert!(!cool.is_warm());
         assert!(cool.is_cool());
-        
+
         let opposite = warm.opposite();
         assert_eq!(opposite.kelvin, 6500);
     }
@@ -258,7 +291,7 @@ mod tests {
             .with_enabled(true)
             .with_time(20, 0, 7, 0)
             .with_temperature(3500);
-        
+
         assert!(schedule.enabled);
         assert_eq!(schedule.start_hour, 20);
         assert_eq!(schedule.temperature, 3500);
@@ -267,11 +300,17 @@ mod tests {
     #[test]
     fn test_apply_schedule() {
         let mut manager = NightlightManager::new();
-        let schedule = NightlightSchedule::new().with_enabled(true);
+        let schedule = NightlightSchedule::new()
+            .with_enabled(true)
+            .with_time(20, 0, 7, 0)
+            .with_temperature(3500);
         manager.set_schedule(schedule);
-        
-        // Schedule is not active now (simulated)
-        let result = manager.apply_schedule().unwrap();
+
+        let result = manager.apply_schedule_at(23, 0).unwrap();
+        assert!(manager.is_enabled());
+        assert_eq!(result.kelvin, 3500);
+
+        let result = manager.apply_schedule_at(12, 0).unwrap();
         assert!(!manager.is_enabled());
         assert_eq!(result.kelvin, 6500);
     }
