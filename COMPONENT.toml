@@ -3,12 +3,12 @@ name = "SigmaOS-nightlight"
 tier = 2
 stability = "scaffold"
 language = "rust"
-description = "nightlight component"
+description = "SigmaOS night light and blue-light filter"
 upstream = []
 
 [contract]
 provides = ["component"]
-depends_on = []
+depends_on = ["SigmaOS-system"]
 
 [maturity]
 status = "Scaffold"
